@@ -4,11 +4,13 @@ import sys
 from pathlib import Path
 from PIL import Image
 import time
+import cv2
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from src.preprocessing.image_processor import ImagePreprocessor
+from src.preprocessing.diagram_detector import DiagramDetector
 from src.ocr.hybrid_ocr import HybridOCR
 from src.postprocessing.llm_corrector import LLMCorrector
 from src.document_generation.word_generator import WordGenerator
@@ -21,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS (keep your existing CSS)
 st.markdown("""
 <style>
     .main-header {
@@ -43,13 +45,6 @@ st.markdown("""
         border: 1px solid #c3e6cb;
         color: #155724;
     }
-    .info-box {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        background-color: #d1ecf1;
-        border: 1px solid #bee5eb;
-        color: #0c5460;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -60,6 +55,12 @@ if 'output_path' not in st.session_state:
     st.session_state.output_path = None
 if 'ocr_info' not in st.session_state:
     st.session_state.ocr_info = {}
+if 'diagram_info' not in st.session_state:
+    st.session_state.diagram_info = {}
+if 'ocr_engine' not in st.session_state:
+    st.session_state.ocr_engine = None
+if 'current_model' not in st.session_state:
+    st.session_state.current_model = None
 
 # Header
 st.markdown('<h1 class="main-header">📝 Handwriting to Word Converter</h1>', unsafe_allow_html=True)
@@ -69,43 +70,102 @@ st.markdown("### Transform your handwritten notes into editable Word documents w
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # Model selection
-    st.subheader("🤖 OCR Strategy")
-    ocr_mode = st.radio(
-        "Select OCR Mode:",
-        ["API First (Groq → Local → EasyOCR)", "Local Only (Florence-2 → EasyOCR)"],
-        help="API First: Try Groq Llama Vision API, fallback to local. Local Only: Skip API, use Florence-2 directly."
+    # OCR Model Selection
+    st.subheader("🤖 OCR Model")
+    ocr_model = st.selectbox(
+        "Select OCR Engine:",
+        [
+            "Auto (Smart Fallback)",
+            "Llama Vision API (Groq)",
+            "Florence-2 Local",
+            "GOT-OCR 2.0 Local",
+            "EasyOCR"
+        ],
+        help="Auto: Tries API → Florence → GOT-OCR → EasyOCR"
     )
-    prefer_local = "Local Only" in ocr_mode
+    
+    # Map selection to parameters
+    if ocr_model == "Llama Vision API (Groq)":
+        prefer_local = False
+        force_model = "api"
+    elif ocr_model == "Florence-2 Local":
+        prefer_local = True
+        force_model = "florence"
+    elif ocr_model == "GOT-OCR 2.0 Local":
+        prefer_local = True
+        force_model = "got"
+    elif ocr_model == "EasyOCR":
+        prefer_local = True
+        force_model = "easyocr"
+    else:  # Auto
+        prefer_local = False
+        force_model = None
+    
+    # Diagram handling
+    st.subheader("📊 Diagram Detection")
+    detect_diagrams = st.checkbox(
+        "Enable Diagram Detection",
+        value=True,
+        help="Automatically detect and extract diagrams/graphs"
+    )
+    
+    if detect_diagrams:
+        diagram_handling = st.radio(
+            "Diagram Handling:",
+            ["Embed in Document", "Describe with AI", "Both"],
+            help="How to handle detected diagrams"
+        )
     
     # LLM Correction
     st.subheader("✨ Text Enhancement")
     use_llm = st.checkbox(
         "Enable LLM Correction",
         value=True,
-        help="Use AI to fix OCR errors and improve text quality"
+        help="Use AI to fix OCR errors"
     )
     
     # Advanced options
     with st.expander("🔧 Advanced Options"):
-        try_preprocessed = st.checkbox(
-            "Retry with Preprocessed Image", 
-            value=True,
-            help="If OCR fails on original, try preprocessed version"
-        )
+        try_preprocessed = st.checkbox("Retry with Preprocessed", value=True)
         show_preview = st.checkbox("Show Text Preview", value=True)
+        show_diagrams = st.checkbox("Show Detected Diagrams", value=True)
     
     st.divider()
     
-    # Info
-    st.info("""
-    **💡 Tips:**
-    - Use clear, well-lit images
-    - Avoid shadows and glare
-    - Higher resolution = better results
-    - API mode requires Groq API key
-    - Local mode needs ~6GB VRAM
-    """)
+    # Model info
+    st.subheader("ℹ️ Model Information")
+    if ocr_model == "Florence-2 Local":
+        st.info("""
+        **Florence-2-Base**
+        - 230M parameters
+        - Best for: Mixed content
+        - Can describe diagrams
+        - Confidence: Estimated (~85%)
+        """)
+    elif ocr_model == "GOT-OCR 2.0 Local":
+        st.info("""
+        **GOT-OCR 2.0**
+        - 580M parameters
+        - Best for: Handwriting + Formulas
+        - Supports LaTeX formulas
+        - Format preservation
+        - Confidence: Estimated (~90%)
+        """)
+    elif ocr_model == "Llama Vision API (Groq)":
+        st.info("""
+        **Llama 4 Scout Vision**
+        - API-based (requires key)
+        - Best quality overall
+        - Handles all content types
+        - Confidence: Estimated (~95%)
+        """)
+    elif ocr_model == "EasyOCR":
+        st.info("""
+        **EasyOCR**
+        - Lightweight
+        - Reliable fallback
+        - Confidence: Per-character
+        """)
     
     # API Status
     st.subheader("🔑 API Status")
@@ -114,7 +174,6 @@ with st.sidebar:
         st.success("✅ Groq API Key Found")
     else:
         st.warning("⚠️ No Groq API Key")
-        st.caption("Add GROQ_API_KEY to .env for API mode")
 
 # Main content
 col1, col2 = st.columns([1, 1])
@@ -125,23 +184,18 @@ with col1:
     uploaded_files = st.file_uploader(
         "Choose image(s) of handwritten notes",
         type=["jpg", "jpeg", "png", "bmp"],
-        accept_multiple_files=True,
-        help="You can upload multiple images to process separately"
+        accept_multiple_files=True
     )
     
     if uploaded_files:
         st.success(f"✅ {len(uploaded_files)} image(s) uploaded")
         
         # Show thumbnails
-        st.write("**Preview:**")
         cols = st.columns(min(len(uploaded_files), 3))
         for idx, uploaded_file in enumerate(uploaded_files[:3]):
             with cols[idx]:
                 image = Image.open(uploaded_file)
                 st.image(image, use_column_width=True, caption=uploaded_file.name)
-        
-        if len(uploaded_files) > 3:
-            st.info(f"+ {len(uploaded_files) - 3} more image(s)")
 
 with col2:
     st.subheader("💾 Output Settings")
@@ -149,40 +203,43 @@ with col2:
     output_name = st.text_input(
         "Document Name",
         value="MyNotes",
-        help="Name for the output Word document (without extension)"
+        help="Name for output Word document"
     )
-    
-    # Ensure outputs directory exists
-    os.makedirs("outputs", exist_ok=True)
-    os.makedirs("uploads", exist_ok=True)
-    os.makedirs("temp", exist_ok=True)
 
 # Process button
 st.divider()
 
 if uploaded_files:
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    with col_btn2:
-        process_btn = st.button(
-            "🚀 Convert to Word Document",
-            type="primary"
-        )
-    
-    if process_btn:
+    if st.button("🚀 Convert to Word Document", type="primary"):
         st.session_state.processed = False
         
-        # Save uploaded files
-        image_paths = []
-        for uploaded_file in uploaded_files:
-            file_path = f"uploads/{uploaded_file.name}"
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            image_paths.append(file_path)
-        
-        # Progress tracking
+        # Progress tracking (setup first)
         progress_bar = st.progress(0)
         status_text = st.empty()
         log_container = st.expander("📋 Processing Log", expanded=True)
+        
+        # Save uploaded files
+        os.makedirs("uploads", exist_ok=True)
+        os.makedirs("outputs", exist_ok=True)
+        os.makedirs("temp", exist_ok=True)
+        
+        # Save uploaded files with timestamp to avoid conflicts
+        import time
+        timestamp = int(time.time())
+        
+        image_paths = []
+        for idx, uploaded_file in enumerate(uploaded_files):
+            # Use timestamp to ensure unique filenames
+            file_ext = os.path.splitext(uploaded_file.name)[1]
+            file_path = f"uploads/{timestamp}_{idx}_{uploaded_file.name}"
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            image_paths.append(file_path)
+            
+        with log_container:
+            st.write(f"📁 Saved {len(image_paths)} file(s):")
+            for path in image_paths:
+                st.write(f"   - {os.path.basename(path)}")
         
         try:
             # Initialize pipeline
@@ -192,19 +249,38 @@ if uploaded_files:
             progress_bar.progress(10)
             
             preprocessor = ImagePreprocessor()
-            ocr_engine = HybridOCR(prefer_local=prefer_local)
+            diagram_detector = DiagramDetector() if detect_diagrams else None
+            
+            # Reuse OCR engine if same model, otherwise create new one
+            model_key = f"{prefer_local}_{force_model if force_model else 'auto'}"
+            if st.session_state.current_model != model_key or st.session_state.ocr_engine is None:
+                with log_container:
+                    st.write(f"📥 Loading OCR model: {ocr_model}...")
+                if st.session_state.ocr_engine:
+                    st.session_state.ocr_engine.cleanup()
+                st.session_state.ocr_engine = HybridOCR(prefer_local=prefer_local, local_model=force_model if force_model else "auto")
+                st.session_state.current_model = model_key
+            else:
+                with log_container:
+                    st.write(f"♻️ Reusing cached OCR model: {ocr_model}")
+            
+            ocr_engine = st.session_state.ocr_engine
             llm_corrector = LLMCorrector() if use_llm else None
             word_generator = WordGenerator()
             
             progress_bar.progress(20)
             
-            # Process first image (or combine multiple)
-            # For simplicity, processing first image. You can extend for multiple.
+            # Process all uploaded images (or just first if multiple)
+            if len(image_paths) > 1:
+                with log_container:
+                    st.write(f"📚 Processing {len(image_paths)} images...")
+                    st.write("   (Currently processing first image only)")
+            
             img_path = image_paths[0]
             
             with log_container:
                 st.write(f"📸 Processing: {os.path.basename(img_path)}")
-            status_text.text(f"📸 Processing image...")
+            status_text.text(f"📸 Processing {os.path.basename(img_path)}...")
             
             # Step 1: Preprocessing
             with log_container:
@@ -212,9 +288,35 @@ if uploaded_files:
             preprocessed_img, preprocessed_path = preprocessor.preprocess(img_path)
             progress_bar.progress(30)
             
-            # Step 2: OCR
+            # Step 2: Diagram detection
+            diagrams = []
+            if detect_diagrams and diagram_detector:
+                with log_container:
+                    st.write("STEP 2: Detecting diagrams...")
+                status_text.text("🔍 Detecting diagrams...")
+                diagram_result = diagram_detector.detect_and_extract(img_path)
+                
+                if diagram_result.get('has_diagrams'):
+                    diagrams = diagram_result.get('diagram_regions', [])
+                    with log_container:
+                        st.write(f"   Found {len(diagrams)} diagram(s)")
+                    st.session_state.diagram_info = {'count': len(diagrams)}
+                    
+                    if show_diagrams:
+                        with log_container:
+                            st.write("**Detected Diagrams:**")
+                            cols = st.columns(min(len(diagrams), 3))
+                            for idx, diag in enumerate(diagrams[:3]):
+                                with cols[idx]:
+                                    diag_img = cv2.imread(diag['path'])
+                                    diag_img_rgb = cv2.cvtColor(diag_img, cv2.COLOR_BGR2RGB)
+                                    st.image(diag_img_rgb, caption=f"Diagram {idx+1}", use_column_width=True)
+            
+            progress_bar.progress(40)
+            
+            # Step 3: OCR
             with log_container:
-                st.write("STEP 2: Running Hybrid OCR...")
+                st.write("STEP 3: Running OCR...")
             status_text.text("🔍 Running OCR...")
             
             # Try original first
@@ -254,10 +356,10 @@ if uploaded_files:
                 with log_container:
                     st.text_area("📄 Extracted Text Preview:", extracted_text[:500] + "...", height=150)
             
-            # Step 3: LLM correction
+            # Step 4: LLM correction
             if use_llm and llm_corrector:
                 with log_container:
-                    st.write("STEP 3: LLM post-processing...")
+                    st.write("STEP 4: LLM post-processing...")
                 status_text.text("✨ Enhancing text with AI...")
                 
                 corrected_text = llm_corrector.correct_text(extracted_text)
@@ -267,12 +369,23 @@ if uploaded_files:
                 structured_text = extracted_text
                 progress_bar.progress(80)
             
-            # Step 4: Generate Word document
+            # Step 5: Generate Word document
             with log_container:
-                st.write("STEP 4: Generating Word document...")
+                st.write("STEP 5: Generating Word document...")
             status_text.text("📄 Creating Word document...")
             
-            output_path = word_generator.create_document(structured_text, output_name)
+            # Pass diagrams to word generator if available
+            diagrams_to_embed = None
+            if detect_diagrams and diagrams:
+                diagrams_to_embed = diagrams
+                with log_container:
+                    st.write(f"📊 Embedding {len(diagrams)} diagram(s) in document")
+            
+            output_path = word_generator.create_document(
+                structured_text, 
+                output_name,
+                diagrams=diagrams_to_embed
+            )
             progress_bar.progress(100)
             
             # Success
@@ -286,8 +399,7 @@ if uploaded_files:
             time.sleep(0.5)
             st.balloons()
             
-            # Cleanup
-            ocr_engine.cleanup()
+            # Don't cleanup - keep models cached for next run
             
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
@@ -300,7 +412,7 @@ if st.session_state.processed and st.session_state.output_path:
     st.markdown('<div class="success-box">', unsafe_allow_html=True)
     st.markdown("### ✅ Conversion Complete!")
     
-    # Show OCR info
+    # Show metrics
     if st.session_state.ocr_info:
         col_info1, col_info2, col_info3 = st.columns(3)
         with col_info1:
@@ -309,6 +421,10 @@ if st.session_state.processed and st.session_state.output_path:
             st.metric("Confidence", f"{st.session_state.ocr_info.get('confidence', 0):.1%}")
         with col_info3:
             st.metric("Text Length", f"{st.session_state.ocr_info.get('text_length', 0)} chars")
+    
+    # Show diagram info
+    if st.session_state.diagram_info:
+        st.info(f"📊 Detected {st.session_state.diagram_info.get('count', 0)} diagram(s)")
     
     st.markdown(f"**Document saved:** `{st.session_state.output_path}`")
     st.markdown('</div>', unsafe_allow_html=True)

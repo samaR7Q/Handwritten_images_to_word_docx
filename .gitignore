@@ -34,6 +34,11 @@ outputs/*
 temp/*
 !temp/.gitkeep
 
+# Copy files (development versions)
+*copy*.py
+*copy*.md
+*copy*.*
+
 # IDE
 .vscode/
 .idea/
