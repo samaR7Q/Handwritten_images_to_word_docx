@@ -140,7 +140,6 @@ with st.sidebar:
         - 230M parameters
         - Best for: Mixed content
         - Can describe diagrams
-        - Confidence: Estimated (~85%)
         """)
     elif ocr_model == "GOT-OCR 2.0 Local":
         st.info("""
@@ -149,7 +148,6 @@ with st.sidebar:
         - Best for: Handwriting + Formulas
         - Supports LaTeX formulas
         - Format preservation
-        - Confidence: Estimated (~90%)
         """)
     elif ocr_model == "Llama Vision API (Groq)":
         st.info("""
@@ -157,14 +155,12 @@ with st.sidebar:
         - API-based (requires key)
         - Best quality overall
         - Handles all content types
-        - Confidence: Estimated (~95%)
         """)
     elif ocr_model == "EasyOCR":
         st.info("""
         **EasyOCR**
         - Lightweight
         - Reliable fallback
-        - Confidence: Per-character
         """)
     
     # API Status
@@ -337,14 +333,14 @@ if uploaded_files:
             # Store OCR info
             st.session_state.ocr_info = {
                 'method': method,
-                'confidence': confidence,
+                # 'confidence': confidence,
                 'text_length': len(extracted_text)
             }
             
             with log_container:
                 st.write(f"📊 OCR Results:")
                 st.write(f"   - Method: **{method}**")
-                st.write(f"   - Confidence: **{confidence:.2%}**")
+                # st.write(f"   - Confidence: **{confidence:.2%}**")
                 st.write(f"   - Text length: **{len(extracted_text)}** characters")
             
             if len(extracted_text) < 20:
@@ -417,8 +413,8 @@ if st.session_state.processed and st.session_state.output_path:
         col_info1, col_info2, col_info3 = st.columns(3)
         with col_info1:
             st.metric("OCR Method", st.session_state.ocr_info.get('method', 'N/A'))
-        with col_info2:
-            st.metric("Confidence", f"{st.session_state.ocr_info.get('confidence', 0):.1%}")
+        # with col_info2:
+        #     st.metric("Confidence", f"{st.session_state.ocr_info.get('confidence', 0):.1%}")
         with col_info3:
             st.metric("Text Length", f"{st.session_state.ocr_info.get('text_length', 0)} chars")
     
