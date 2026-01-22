@@ -162,22 +162,6 @@ The system automatically detects and handles diagrams using computer vision:
 4. **Text Masking**: Creates text-only version for better OCR
 5. **Document Embedding**: Adds diagrams to Word document with captions
 
-### What It Detects Well
-
-✅ **Graphs & Charts** - Has axes and data points
-✅ **Flowcharts** - Has boxes and connecting arrows  
-✅ **Circuit Diagrams** - Has components and connections
-✅ **Chemical Structures** - Has bonds and atoms
-✅ **Mathematical Plots** - Has coordinate systems
-
-## 💡 Tips for Best Results
-
-- **Image Quality**: Use clear, well-lit images
-- **Resolution**: Higher resolution = better OCR accuracy (max 2000px recommended)
-- **Contrast**: Ensure good contrast between text and background
-- **Orientation**: Keep text horizontal and properly aligned
-- **Lighting**: Avoid shadows and glare
-- **Content**: GOT-OCR 2.0 excels at chemistry formulas and equations
 
 ## 🐛 Troubleshooting
 
@@ -210,23 +194,6 @@ python -m src.main_pipeline uploads/image.jpg OutputName
 python -c "from transformers import AutoModel; AutoModel.from_pretrained('microsoft/Florence-2-base', trust_remote_code=True)"
 python -c "from transformers import AutoModel; AutoModel.from_pretrained('stepfun-ai/GOT-OCR2_0', trust_remote_code=True)"
 ```
-
-## 📊 Performance Comparison
-
-| Method | Speed | Quality | Requirements | Best Use Case |
-|--------|-------|---------|--------------|---------------|
-| Groq API | ⚡⚡⚡ | ⭐⭐⭐⭐⭐ | API Key | All content types |
-| Florence-2 | ⚡⚡ | ⭐⭐⭐⭐ | 4GB VRAM | Mixed content |
-| GOT-OCR 2.0 | ⚡⚡ | ⭐⭐⭐⭐⭐ | 6GB VRAM | Handwriting + formulas |
-| EasyOCR | ⚡ | ⭐⭐⭐ | 2GB VRAM | Simple text |
-
-## 🔑 API Keys
-
-### Groq API (Free Tier)
-1. Sign up at https://console.groq.com/
-2. Create an API key
-3. Add to `.env`: `GROQ_API_KEY=your_key_here`
-4. Free tier includes generous limits for personal use
 
 ## 🛠️ Development
 
