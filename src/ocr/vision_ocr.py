@@ -49,7 +49,14 @@ Rules:
    - Describe axes, labels, and key features
 7. Maintain the reading order (top to bottom, left to right)
 8. Don't skip anything - transcribe everything visible
-
+9: Do not return answers in LaTeX format.
+    Write all mathematical formulas in plain text, using standard symbols.
+    For example:
+        Fractions as a / b
+        Powers as x^2
+        Subscripts as I_DC
+        Integrals as integral(expression, variable, lower, upper) if needed
+        Piecewise functions using words or simple if-then notation
 Output only the transcribed text with diagram descriptions."""
                             },
                             {

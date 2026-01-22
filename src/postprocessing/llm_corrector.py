@@ -115,6 +115,18 @@ Instructions:
 4. Preserve all equations, formulas, and diagrams
 5. Use bullet points for lists
 6. Keep [DIAGRAM] markers
+7. Instructions:
+    Do not return answers in LaTeX format.
+    Write all mathematical formulas in plain text, using standard symbols.
+    For example:
+    Fractions as a / b
+    Powers as x^2
+    Subscripts as I_DC
+    Integrals as integral(expression, variable, lower, upper) if needed
+    Piecewise functions using words or simple if-then notation
+***IMPORTANT***
+DONOT ADD ANY OTHER LINE OR DESCRIPTION FROM YOURSELF. YOUR TASK IS TO CORRECT THE CONTENT. 
+DONOT ADD ADDITIONAL TEXT
 
 Return structured markdown:"""
 

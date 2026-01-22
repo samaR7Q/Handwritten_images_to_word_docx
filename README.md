@@ -9,9 +9,9 @@ AI-powered tool to convert handwritten notes into editable Word documents using 
   - Florence-2 Local (offline, mixed content)
   - GOT-OCR 2.0 (handwriting + formulas, LaTeX output)
   - EasyOCR (universal fallback)
-- **📊 Smart Diagram Detection**: Automatically detects and extracts diagrams/graphs
-- **✨ LLM Post-Processing**: Fix OCR errors and improve text quality
-- **📄 Professional Word Documents**: Proper formatting with embedded diagrams
+- ** Smart Diagram Detection **: Automatically detects and extracts diagrams/graphs
+- ** LLM Post-Processing**: Fix OCR errors and improve text quality
+- ** Professional Word Documents**: Proper formatting with embedded diagrams
 - **🎨 Beautiful Web UI**: Streamlit-based interface with real-time progress
 - **📈 Detailed Metrics**: See which OCR method was used and confidence scores
 - **🔄 Model Caching**: Keeps models loaded for faster subsequent processing
@@ -133,14 +133,6 @@ handwriting_to_word/
 - Requires CUDA GPU with 4-8GB VRAM (recommended)
 - Works on CPU (slower)
 
-### Model Specifications
-
-| Model | Size | VRAM | Best For | Confidence |
-|-------|------|------|----------|------------|
-| **Llama Vision API** | API | 0GB | All content types | ~95% |
-| **Florence-2** | 230M | 4GB | Mixed content + diagrams | ~85% |
-| **GOT-OCR 2.0** | 580M | 6GB | Handwriting + formulas | ~90% |
-| **EasyOCR** | 50M | 2GB | Fallback | Per-char |
 
 ### LLM Correction
 
@@ -228,12 +220,7 @@ Models are cached in session state for the web interface:
 - ✅ **Better Error Handling**: Graceful fallbacks and detailed logging
 - ✅ **Formula Support**: LaTeX output for mathematical expressions
 
-## 📄 License
 
-This project is for educational purposes. Please respect the licenses of the underlying models:
-- Florence-2: MIT License
-- GOT-OCR 2.0: Apache 2.0 License
-- EasyOCR: Apache 2.0 License
 
 ## 🙏 Acknowledgments
 
@@ -253,4 +240,4 @@ For issues or questions:
 
 ---
 
-Made with ❤️ using Python, PyTorch, and AI | Perfect for converting chemistry notes, math homework, and handwritten documents!
+Made with ❤️ using Python and AI | Perfect for converting notes, math homework, and handwritten documents!
